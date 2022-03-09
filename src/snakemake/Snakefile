@@ -1,0 +1,132 @@
+
+rule all:
+  input:
+    "data/basset_like/full/targets.txt",
+    "data/basset_like/hg19.ml.fa" ,
+    "data/basset_like/full/targets.txt" ,
+    # "data/basset_like/downsampled0.05_wo.chr2/sequences.bed", 
+    "data/basset_tfr/downsampled5p/targets.txt"
+
+rule download_dnase:
+  input:
+    "config/targets.txt"
+  output:
+    "data/basset_like/full/targets.txt"
+  shell:
+    """
+    mkdir data/basset_like/full/encode 
+    wget -r ftp://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeAwgDnaseUniform 
+    mv hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeAwgDnaseUniform/* data/basset_like/full/encode 
+    rm -r hgdownload.cse.ucsc.edu 
+
+    mkdir data/basset_like/full/roadmap
+    wget -r -A "*DNase.hotspot.fdr0.01.peaks.bed.gz" http://egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak 
+    mv egg2.wustl.edu/roadmap/data/byFileType/peaks/consolidated/narrowPeak/archive_DNase_hotspot_peaks/* data/basset_like/full/roadmap 
+    rm -r egg2.wustl.edu 
+    
+    sed -e "s|data/basenji_peak/|data/basset_like/full/|" < {input} > {output}
+    """
+
+rule download_seqs:
+  output:
+    fasta="data/basset_like/hg19.ml.fa",
+    blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed"
+ 
+  conda:
+   "../../env/samtools.yaml"
+ 
+  shell:
+    """
+
+    curl -o {output.fasta} https://storage.googleapis.com/basenji_tutorial_data/hg19.ml.fa
+    samtools faidx {output.fasta}
+   
+    curl -O https://personal.broadinstitute.org/anshul/projects/encode/rawdata/blacklists/wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz
+    gunzip wgEncodeHg19ConsensusSignalArtifactRegions.bed.gz
+    mv wgEncodeHg19ConsensusSignalArtifactRegions.bed {output.blacklist}
+    
+    """
+
+# Here I suggest to create rule for leaving one chromosome
+# from original data. Inputs are considered as paths to
+# encode and roadmap data. Outputs are directories with specific lables
+# e.g. 'data/basset_like/test_data/lo1_chr_roadmap' which will be path
+# to roadmap DNase-seq data without chr1.
+# How to include all chr in one rule?
+# How to use wildcards on cell types?
+# How to set encode and roadmap celltypes as inputs? Loops with python (?)
+rule leave_one_chr:
+  input:
+    encode="data/basset_like/encode/*.gz"
+    roadmap="data/basset_like/roadmap/*.gz"
+    targets="data/basset_like/full/targets.txt"
+  output:
+    targets="data/basset_like/{wo_chrx_dataset}/targets.txt"
+
+  shell:
+    """
+    zcat {input.encode}| grep -v -P "^chr1\t" | gzip > data/basset_like/{wildcards.wo_chrx_dataset}/encode/*.bed.gz
+    zcat {input.roadmap}| grep -v -P "^chr1\t" | gzip > data/basset_like/{wildcards.wo_chrx_dataset}/encode/*.bed.gz
+    sed -e "s|data/basset_like/full/|data/basset_like/{wildcards.wo_chrx_dataset}/|" < {input.targets} > {output.targets}
+    """
+
+rule make_data:
+  input:
+    fasta="data/basset_like/hg19.ml.fa",
+    blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed",
+    targets="data/basset_like/full/targets.txt"
+
+  output:
+    targets="data/basset_tfr/full/targets.txt"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    "basenji_data.py -b {input.blacklist} --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 "
+    "-o data/basset_tfr/full {input.fasta} {input.targets} "
+
+
+# Setting conda basenji_gpu does not work
+rule make_data_downsampled5p:
+  input:
+    fasta="data/basset_like/hg19.ml.fa",
+    blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed",
+    targets="data/basset_like/full/targets.txt"
+
+  output:
+    targets="data/basset_tfr/downsampled5p/targets.txt"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    "basenji_data.py -b {input.blacklist} -d 0.05  --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 "
+    "-o data/basset_tfr/downsampled5p {input.fasta} {input.targets} "
+
+
+rule train:
+  input:
+    params="config/params_basset.json"
+
+  output:
+    targets="data/basset_model/{dataset}/model_best.h5"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    "CUDA_VISIBLE_DEVICES=1 basenji_train.py -o data/basset_model/{dataset} {input.params} data/basset_tfr/{dataset}" 
+
+rule test:
+  input:
+    model="data/basset_model/{dataset}/model_best.h5"
+    params="config/params_basset.json"
+  output:
+    result="results/{dataset}/acc.txt"
+
+  shell:
+    "time CUDA_VISIBLE_DEVICES=1 basenji_test.py -o results/{dataset} --rc --shifts "1,0,-1 ""
+    "{input.params} {input.model} data/basset_tfr/{dataset}"
+
+
