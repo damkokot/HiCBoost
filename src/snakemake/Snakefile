@@ -1,11 +1,18 @@
+CHROMOSOMES=['chr1' , 'chr2']
+DATASETS=['full',]
 
 rule all:
   input:
-    "data/basset_like/full/targets.txt",
-    "data/basset_like/hg19.ml.fa" ,
-    "data/basset_like/full/targets.txt" ,
-    # "data/basset_like/downsampled0.05_wo.chr2/sequences.bed", 
-    "data/basset_tfr/downsampled5p/targets.txt"
+    "data/basset_tfr/full/targets.txt" ,
+    "data/basset_tfr/full_downsampled5p/targets.txt",
+    expand("data/basset_tfr/wo_{chr}_downsampled5p/targets.txt", chr=CHROMOSOMES),
+    #expand("data/basset_model/{dataset}_downsampled5p/model_best.h5", dataset=DATASETS), # if expand option will not be used, the error prompts
+    expand('data/basset_model/{dataset}/model_best.h5', dataset=DATASETS),
+    # expand("results/basset_model/{dataset}_downsampled5p/acc.txt", dataset=DATASETS),
+    expand("results/basset_model/{dataset}/acc.txt", dataset=DATASETS),
+    # "data/basset_predict/{predict_dataset}_model_{model_dataset}.bed"
+    # "data/basset_predict/test_sequences_wo_chr1_downsampled5p/model_wo_chr1_downsampled5p/predict.h5"
+    "data/basset_predict/test_sequences_full/model_full/predict.h5"
 
 rule download_dnase:
   input:
@@ -47,62 +54,80 @@ rule download_seqs:
     
     """
 
-# Here I suggest to create rule for leaving one chromosome
-# from original data. Inputs are considered as paths to
-# encode and roadmap data. Outputs are directories with specific lables
-# e.g. 'data/basset_like/test_data/lo1_chr_roadmap' which will be path
-# to roadmap DNase-seq data without chr1.
-# How to include all chr in one rule?
-# How to use wildcards on cell types?
-# How to set encode and roadmap celltypes as inputs? Loops with python (?)
-rule leave_one_chr:
+rule leave_out_one_chr:
   input:
-    encode="data/basset_like/encode/*.gz"
-    roadmap="data/basset_like/roadmap/*.gz"
-    targets="data/basset_like/full/targets.txt"
+    "data/basset_like/full/targets.txt"
   output:
-    targets="data/basset_like/{wo_chrx_dataset}/targets.txt"
+    "data/basset_like/wo_{chr}/targets.txt"
 
   shell:
     """
-    zcat {input.encode}| grep -v -P "^chr1\t" | gzip > data/basset_like/{wildcards.wo_chrx_dataset}/encode/*.bed.gz
-    zcat {input.roadmap}| grep -v -P "^chr1\t" | gzip > data/basset_like/{wildcards.wo_chrx_dataset}/encode/*.bed.gz
-    sed -e "s|data/basset_like/full/|data/basset_like/{wildcards.wo_chrx_dataset}/|" < {input.targets} > {output.targets}
+    mkdir -p data/basset_like/wo_{wildcards.chr}/encode/
+    mkdir -p data/basset_like/wo_{wildcards.chr}/roadmap/
+    
+    for f in $(cd data/basset_like/full/encode; ls *.narrowPeak.gz); do
+      zcat data/basset_like/full/encode/$f |
+        grep -v -P "^{wildcards.chr}\t" |
+        gzip > data/basset_like/wo_{wildcards.chr}/encode/$f
+    done
+
+    for f in $(cd data/basset_like/full/roadmap; ls *.bed.gz); do
+      zcat data/basset_like/full/roadmap/$f |
+        grep -v -P "^{wildcards.chr}\t" |
+        gzip > data/basset_like/wo_{wildcards.chr}/roadmap/$f
+    done
+
+    sed -e "s|data/basset_like/full/|data/basset_like/wo_{wildcards.chr}/|" < {input} > {output}
     """
 
 rule make_data:
   input:
     fasta="data/basset_like/hg19.ml.fa",
     blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed",
-    targets="data/basset_like/full/targets.txt"
+    targets="data/basset_like/{dataset}/targets.txt"
 
   output:
-    targets="data/basset_tfr/full/targets.txt"
+    "data/basset_tfr/{dataset}/targets.txt", 
+    "data/basset_tfr/{dataset}/sequences.bed"
+
 
   conda:
     "basenji_gpu"
 
   shell:
-    "basenji_data.py -b {input.blacklist} --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 "
-    "-o data/basset_tfr/full {input.fasta} {input.targets} "
+    """
+    rmdir data/basset_tfr/{wildcards.dataset}
 
+    basenji_data.py -b {input.blacklist} \
+      --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 \
+      -o data/basset_tfr/{wildcards.dataset} {input.fasta} {input.targets}
+    """
 
-# Setting conda basenji_gpu does not work
 rule make_data_downsampled5p:
   input:
     fasta="data/basset_like/hg19.ml.fa",
     blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed",
-    targets="data/basset_like/full/targets.txt"
+    targets="data/basset_like/{dataset}/targets.txt"
 
   output:
-    targets="data/basset_tfr/downsampled5p/targets.txt"
+    "data/basset_tfr/{dataset}_downsampled5p/targets.txt",
+    "data/basset_tfr/{dataset}_downsampled5p/sequences.bed"
 
   conda:
     "basenji_gpu"
 
   shell:
-    "basenji_data.py -b {input.blacklist} -d 0.05  --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 "
-    "-o data/basset_tfr/downsampled5p {input.fasta} {input.targets} "
+    """
+    rmdir data/basset_tfr/{wildcards.dataset}_downsampled5p
+
+    basenji_data.py -b {input.blacklist} -d 0.05 \
+      --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 \
+      -o data/basset_tfr/{wildcards.dataset}_downsampled5p {input.fasta} {input.targets}
+    """
+
+
+ruleorder:
+  make_data_downsampled5p > make_data
 
 
 rule train:
@@ -112,21 +137,79 @@ rule train:
   output:
     targets="data/basset_model/{dataset}/model_best.h5"
 
+  threads:
+    6
+
   conda:
     "basenji_gpu"
 
   shell:
-    "CUDA_VISIBLE_DEVICES=1 basenji_train.py -o data/basset_model/{dataset} {input.params} data/basset_tfr/{dataset}" 
+    """
+    export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+    export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
+    
+    rmdir data/basset_model/{wildcards.dataset}
+    
+    CUDA_VISIBLE_DEVICES=1 basenji_train.py -o data/basset_model/{wildcards.dataset} \
+      {input.params} data/basset_tfr/{wildcards.dataset}
+    """
 
 rule test:
   input:
-    model="data/basset_model/{dataset}/model_best.h5"
+    model="data/basset_model/{dataset}/model_best.h5",
     params="config/params_basset.json"
   output:
-    result="results/{dataset}/acc.txt"
+    result="results/basset_model/{dataset}/acc.txt"
+
+  conda:
+    "basenji_gpu"
+  
+  shell:
+    """
+    export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+    export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
+
+    rmdir results/basset_model/{wildcards.dataset}
+    time CUDA_VISIBLE_DEVICES=1 basenji_test.py -o results/basset_model/{wildcards.dataset} \
+      --rc --shifts "1,0,-1" \
+      --save {input.params} {input.model} data/basset_tfr/{wildcards.dataset} | tee logs/{wildcards.dataset}_test.txt
+    """
+
+
+rule make_test_sequences:
+  input:
+    "data/basset_tfr/{dataset}/sequences.bed"
+  output:  
+    "data/basset_tfr/{dataset}/test_sequences.bed"
 
   shell:
-    "time CUDA_VISIBLE_DEVICES=1 basenji_test.py -o results/{dataset} --rc --shifts "1,0,-1 ""
-    "{input.params} {input.model} data/basset_tfr/{dataset}"
+    """
+    grep "test" {input} > {output}
+    """
+
+
+
+rule predict:
+  input:
+    model="data/basset_model/{model_dataset}/model_best.h5", 
+    bed="data/basset_tfr/{sequences_dataset}/test_sequences.bed", 
+    params="config/params_basset.json", 
+    fasta="data/basset_like/hg19.ml.fa",
+
+  output:
+    "data/basset_predict/test_sequences_{sequences_dataset}/model_{model_dataset}/predict.h5"
+
+  conda:
+    "basenji_gpu"
+  
+  shell:
+    """
+    export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+    export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
+
+    time CUDA_VISIBLE_DEVICES=1 basenji_predict_bed.py -o data/basset_predict/test_sequences_{wildcards.sequences_dataset}/model_{wildcards.model_dataset} \
+      --rc --shifts "1,0,-1" \
+      -f {input.fasta} {input.params} {input.model} {input.bed}
+    """
 
 
