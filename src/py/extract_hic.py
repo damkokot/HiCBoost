@@ -21,14 +21,14 @@ def check_range(margin_point, res, rng):
 	lead indexes of sequence of interest to be outside
 	of chromosome's ends
 	"""
-	return [margin - rng, margin + rng, margin + res]
+	return [margin_point - rng, margin_point + rng, margin_point + res]
 
 def set_lenghts(hic_data):
 	"""
 	Information about each chromosome length
 	"""
 	chrom_len = {}
-	for chrom in hic_data:
+	for chrom in hic_data.getChromosomes():
 		chrom_len.setdefault(chrom.name, chrom.length)
 	return chrom_len
 
@@ -42,17 +42,20 @@ def hic_sequences(test_sequences, hic_data, res, rng):
 	""" 
 	# chrom length
 	chrom_len = set_lenghts(hic_data)
-
-
+	
 	# keeping objects of chromosome matrix
 	# hint: make function from it
-	chr_obj = []
+	chr_obj = {}
+	seq_num = 0
 	for record in test_sequences:
 		chr_num, start_seq, end_seq = record
 		seq_len = int(end_seq) - int(start_seq)
-		if chr_num not in chr_obj:
+		if chr_num[3:] not in chr_obj:
 			contact_obj = hic_data.getMatrixZoomData(chr_num[3:], chr_num[3:], 'observed', 'KR', 'BP', res)
-			chr_obj.append(chr_num)
+			chr_obj[chr_num] = contact_obj
+		else:
+			concat_obj = chr_obj[chr_num]
+		
 		# set marginal to create midpoint of the region of interest
 		margin = int(((int(start_seq)+int(end_seq))/2)/res)*res
 		
@@ -72,23 +75,29 @@ def hic_sequences(test_sequences, hic_data, res, rng):
 		
 		# set contact vector
 		contact_vector = contact_obj.getRecordsAsMatrix(start_row, end_row, start_col, end_col)
-		
+		# print(contact_vector[199])
 		# check shape of contact vector
+		print(chr_num, start_seq, end_seq, 0, 0)
 		if contact_vector.shape != (1, 1):
 		
-		# get best scores of bins
-		# given that set range of contact sequences
-		# NOT SURE IF IT IS IMPLEMENTED RIGHT!!!
+			# get best scores of bins
 			best_contacts = np.argpartition(contact_vector, 5, axis=None)[-5:]
+			# print(best_contacts)
+			neighbour_rank = 1
 			for contact_bin in best_contacts:
+				
 				# set beginning and end of bin
+				begin_bin, end_bin = start_row + (contact_bin * res) - res + 50, start_row + (contact_bin * res) - 50
+				
 				# split it by step of 100 bp
-				for seq_point in range(begin_bin, end_bin, 100):
-					# not finished
-					contact_margin = int((contact_bin*res)-(res/2))
-					start_ct, end_ct = int(contact_margin-seq_len/2), int(contact_margin+seq_len/2)
-					print(chr_num, start_ct, end_ct)
-			
+				flank = 1
+				for seq_point in range(begin_bin, end_bin, 500):
+					start_point, end_point = int(seq_point-seq_len/2), int(seq_point+seq_len/2)
+					if start_point > 0 and end_point < chrom_len[chr_num[3:]]:
+						print(chr_num, start_point, end_point, neighbour_rank, flank)
+						flank += 1
+				neighbour_rank += 1
+		seq_num += 1
 
 	
 if __name__ == '__main__':
