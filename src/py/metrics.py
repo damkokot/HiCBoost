@@ -61,7 +61,7 @@ def create_tsv(auroc_score, auprc_score, output_path):
 				'auroc': auroc_score,
 				'auprc': auprc_score})
 
-	metrics.to_csv(f'{output_path}/metrics.tsv', sep="\t")
+	metrics.to_csv(f'{output_path}', sep="\t")
 
 
 if __name__ == '__main__':
@@ -70,5 +70,5 @@ if __name__ == '__main__':
 	output_path = sys.argv[3] # path where tsv file should be saved
 	y_pred, y_test = load_h5(pred_path, target_path)
 	auroc_score, auprc_score = evaluate(y_pred, y_test)
-	# create_tsv(auroc_score, auprc_score, output_path)
+	create_tsv(auroc_score, auprc_score, output_path)
 	
