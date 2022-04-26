@@ -1,18 +1,26 @@
 CHROMOSOMES=['chr1' , 'chr2']
-DATASETS=['full',]
+DATASETS=['full']
 
 rule all:
   input:
     "data/basset_tfr/full/targets.txt" ,
     "data/basset_tfr/full_downsampled5p/targets.txt",
+    expand("data/basset_tfr/{dataset}_downsampled04p/targets.txt", dataset=DATASETS),
     expand("data/basset_tfr/wo_{chr}_downsampled5p/targets.txt", chr=CHROMOSOMES),
-    #expand("data/basset_model/{dataset}_downsampled5p/model_best.h5", dataset=DATASETS), # if expand option will not be used, the error prompts
+    # expand("data/basset_model/{dataset}_downsampled5p/model_best.h5", dataset=DATASETS), # if expand option will not be used, the error prompts
     expand('data/basset_model/{dataset}/model_best.h5', dataset=DATASETS),
+    "data/basset_tfr/full_downsampled04p/test_sequences.bed",
     # expand("results/basset_model/{dataset}_downsampled5p/acc.txt", dataset=DATASETS),
-    expand("results/basset_model/{dataset}/acc.txt", dataset=DATASETS),
+    # expand("results/basset_model/{dataset}/acc.txt", dataset=DATASETS),
+    #expand("results/basset_model/{dataset}_downsampled04p/acc.txt", dataset=DATASETS),
+    "results/basset_model/model_full/test_sequences_full_downsampled04p/acc.txt",
     # "data/basset_predict/{predict_dataset}_model_{model_dataset}.bed"
     # "data/basset_predict/test_sequences_wo_chr1_downsampled5p/model_wo_chr1_downsampled5p/predict.h5"
-    "data/basset_predict/test_sequences_full/model_full/predict.h5"
+    # "data/basset_predict/test_sequences_full/model_full/predict.h5"
+    # "data/basset_predict/test_sequences_full_downsampled1p/model_full_downsampled1p/predict.h5"
+    "data/basset_predict/test_sequences_full_downsampled04p/model_full/predict.h5",
+    "results/basset_model/model_full/test_sequences_full_downsampled04p/metrics.tsv",
+    "data/basset_tfr/full_downsampled04p/hic_sequences.bed"
 
 rule download_dnase:
   input:
@@ -125,6 +133,27 @@ rule make_data_downsampled5p:
       -o data/basset_tfr/{wildcards.dataset}_downsampled5p {input.fasta} {input.targets}
     """
 
+rule make_data_downsampled04p:
+  input:
+    fasta="data/basset_like/hg19.ml.fa",
+    blacklist="data/basset_like/wgEncodeHg19ConsensusSignalArtifactRegions.bed",
+    targets="data/basset_like/{dataset}/targets.txt"
+
+  output:
+    "data/basset_tfr/{dataset}_downsampled04p/targets.txt",
+    "data/basset_tfr/{dataset}_downsampled04p/sequences.bed"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    """
+    rmdir data/basset_tfr/{wildcards.dataset}_downsampled04p
+
+    basenji_data.py -b {input.blacklist} -d 0.004 \
+      --local -p 8 -r 4096 -w 192 -l 1344 --peaks -v .12 -t .12 --stride 192 --stride_test 192 --crop 576 \
+      -o data/basset_tfr/{wildcards.dataset}_downsampled04p {input.fasta} {input.targets}
+    """
 
 ruleorder:
   make_data_downsampled5p > make_data
@@ -150,31 +179,31 @@ rule train:
     
     rmdir data/basset_model/{wildcards.dataset}
     
-    CUDA_VISIBLE_DEVICES=1 basenji_train.py -o data/basset_model/{wildcards.dataset} \
+    CUDA_VISIBLE_DEVICES=0 basenji_train.py -o data/basset_model/{wildcards.dataset} \
       {input.params} data/basset_tfr/{wildcards.dataset}
     """
 
 rule test:
   input:
-    model="data/basset_model/{dataset}/model_best.h5",
+    model="data/basset_model/{model_dataset}/model_best.h5",
     params="config/params_basset.json"
   output:
-    result="results/basset_model/{dataset}/acc.txt"
+    result="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/acc.txt"
 
   conda:
     "basenji_gpu"
   
   shell:
     """
-    export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+    
     export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
 
-    rmdir results/basset_model/{wildcards.dataset}
-    time CUDA_VISIBLE_DEVICES=1 basenji_test.py -o results/basset_model/{wildcards.dataset} \
+    rmdir results/basset_model/model_{wildcards.model_dataset}/test_sequences_{wildcards.sequences_dataset}
+    taskset -c 20-30 basenji_test.py -o results/basset_model/model_{wildcards.model_dataset}/test_sequences_{wildcards.sequences_dataset} \
       --rc --shifts "1,0,-1" \
-      --save {input.params} {input.model} data/basset_tfr/{wildcards.dataset} | tee logs/{wildcards.dataset}_test.txt
+      --save {input.params} {input.model} data/basset_tfr/{wildcards.sequences_dataset} | tee logs/{wildcards.sequences_dataset}_test.txt
     """
-
+    # export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
 
 rule make_test_sequences:
   input:
@@ -204,12 +233,51 @@ rule predict:
   
   shell:
     """
-    export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+    
     export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
 
-    time CUDA_VISIBLE_DEVICES=1 basenji_predict_bed.py -o data/basset_predict/test_sequences_{wildcards.sequences_dataset}/model_{wildcards.model_dataset} \
+    time taskset -c 20-30 basenji_predict_bed.py -o data/basset_predict/test_sequences_{wildcards.sequences_dataset}/model_{wildcards.model_dataset} \
       --rc --shifts "1,0,-1" \
       -f {input.fasta} {input.params} {input.model} {input.bed}
     """
 
+# export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
 
+
+rule metrics:
+  input:
+    predictions="data/basset_predict/test_sequences_{sequences_dataset}/model_{model_dataset}/predict.h5",
+    targets="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/targets.h5"
+  
+  output:
+    metrics="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/metrics.tsv"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    """
+    python src/py/metrics.py {input.predictions} {input.targets} {output.metrics}
+
+    """
+
+rule extract_hic:
+  input:
+    hic="data/hic/GSE63525_K562_combined_30.hic",
+    targets="data/basset_tfr/{test_sequences}/test_sequences.bed"
+
+  output:
+    tsv="results/hic_output/{test_sequences}_hic.tsv",
+    bed="data/basset_tfr/{test_sequences}/hic_sequences.bed"
+  conda:
+    "hic-straw"
+
+  shell:
+    """
+    taskset -c 20-30 python src/py/extract_hic.py {input.hic} \
+    --targets {input.targets} \
+    --resolution 5000 --range 1000000 \
+    --tsv {output.tsv} \
+    --bed {output.bed}
+    """
+  
