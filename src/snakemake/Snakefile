@@ -3,16 +3,16 @@ DATASETS=['full']
 
 rule all:
   input:
-    "data/basset_tfr/full/targets.txt" ,
-    "data/basset_tfr/full_downsampled5p/targets.txt",
+    # "data/basset_tfr/full/targets.txt" ,
+    # "data/basset_tfr/full_downsampled5p/targets.txt",
     expand("data/basset_tfr/{dataset}_downsampled04p/targets.txt", dataset=DATASETS),
-    expand("data/basset_tfr/wo_{chr}_downsampled5p/targets.txt", chr=CHROMOSOMES),
+    # expand("data/basset_tfr/wo_{chr}_downsampled5p/targets.txt", chr=CHROMOSOMES),
     # expand("data/basset_model/{dataset}_downsampled5p/model_best.h5", dataset=DATASETS), # if expand option will not be used, the error prompts
     expand('data/basset_model/{dataset}/model_best.h5', dataset=DATASETS),
     "data/basset_tfr/full_downsampled04p/test_sequences.bed",
     # expand("results/basset_model/{dataset}_downsampled5p/acc.txt", dataset=DATASETS),
     # expand("results/basset_model/{dataset}/acc.txt", dataset=DATASETS),
-    #expand("results/basset_model/{dataset}_downsampled04p/acc.txt", dataset=DATASETS),
+    # expand("results/basset_model//{dataset}_downsampled04p/acc.txt", dataset=DATASETS),
     "results/basset_model/model_full/test_sequences_full_downsampled04p/acc.txt",
     # "data/basset_predict/{predict_dataset}_model_{model_dataset}.bed"
     # "data/basset_predict/test_sequences_wo_chr1_downsampled5p/model_wo_chr1_downsampled5p/predict.h5"
@@ -20,7 +20,12 @@ rule all:
     # "data/basset_predict/test_sequences_full_downsampled1p/model_full_downsampled1p/predict.h5"
     "data/basset_predict/test_sequences_full_downsampled04p/model_full/predict.h5",
     "results/basset_model/model_full/test_sequences_full_downsampled04p/metrics.tsv",
-    "data/basset_tfr/full_downsampled04p/hic_sequences.bed"
+    "data/basset_tfr/full_downsampled04p/hic_sequences.bed",
+    "data/basset_predict/hic_sequences_full_downsampled04p/model_full/predict.h5",
+    "data/basset_predict/hic_sequences_full_downsampled04p/model_full/avg_predict.h5", 
+    "results/basset_model/model_full/test_sequences_full_downsampled04p/hic_only_metrics.tsv",
+    "results/basset_model/model_full/test_sequences_full_downsampled04p/targets_only_metrics.tsv",
+    "results/basset_model/model_full/test_sequences_full_downsampled04p/wo_hic_metrics.tsv"
 
 rule download_dnase:
   input:
@@ -242,6 +247,48 @@ rule predict:
     """
 
 # export LD_LIBRARY_PATH=/home/dkokot/anaconda3/envs/basenji_gpu/lib:/usr/local/cuda/extras/CUPTI/lib64:
+rule predict_hic:
+  input:
+    model="data/basset_model/{model_dataset}/model_best.h5", 
+    bed="data/basset_tfr/{sequences_dataset}/hic_sequences.bed", 
+    params="config/params_basset.json", 
+    fasta="data/basset_like/hg19.ml.fa",
+
+  output:
+    "data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/predict.h5"
+
+  conda:
+    "basenji_gpu"
+  
+  shell:
+    """
+    
+    export PATH=/home/dkokot/Basenji_HiC/basenji/bin:$PATH
+
+    time taskset -c 20-30 basenji_predict_bed.py -o data/basset_predict/hic_sequences_{wildcards.sequences_dataset}/model_{wildcards.model_dataset} \
+      --rc --shifts "1,0,-1" \
+      -f {input.fasta} {input.params} {input.model} {input.bed}
+    """
+
+
+rule avg_preds:
+  input:
+    preds_hic = "data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/predict.h5", 
+    preds_tsv = "results/hic_output/{sequences_dataset}.tsv"
+
+  output:
+   hic_only = "data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/hic_only_predict.h5", 
+   avg = "data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/avg_predict.h5"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    """
+    python src/py/avg_hic_pred.py -p {input.preds_hic} --tsv {input.preds_tsv} -o {output.avg} \
+    python src/py/avg_hic_pred.py -p {input.preds_hic} --tsv {input.preds_tsv} -o {output.hic_only}
+    """
+
 
 
 rule metrics:
@@ -251,6 +298,40 @@ rule metrics:
   
   output:
     metrics="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/metrics.tsv"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    """
+    python src/py/metrics.py {input.predictions} {input.targets} {output.metrics}
+
+    """
+
+rule metrics_hic_only:
+  input:
+    predictions="data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/hic_only_predict.h5",
+    targets = "results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/targets.h5"
+
+  output:
+    only_hic = "results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/hic_only_metrics.tsv"
+
+  conda:
+    "basenji_gpu"
+
+  shell:
+    """
+    python src/py/metrics.py {input.predictions} {input.targets} {output.metrics}
+
+    """
+
+rule metrics_wo_hic:
+  input:
+    predictions="data/basset_predict/hic_sequences_{sequences_dataset}/model_{model_dataset}/avg_predict.h5",
+    targets="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/targets.h5"
+  
+  output:
+    metrics="results/basset_model/model_{model_dataset}/test_sequences_{sequences_dataset}/wo_hic_metrics.tsv"
 
   conda:
     "basenji_gpu"
