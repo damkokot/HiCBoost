@@ -90,7 +90,7 @@ class Trainer:
     self.make_optimizer()
 
   def compile(self, seqnn_model):
-    # for model in seqnn_model.models:
+    #for model in seqnn_model.models:
     if self.loss == 'bce':
       model_metrics = [metrics.SeqAUC(curve='ROC'), metrics.SeqAUC(curve='PR')]
     else:
@@ -125,7 +125,7 @@ class Trainer:
       tf.keras.callbacks.ModelCheckpoint('%s/model_check.h5'%self.out_dir),
       save_best]
 
-    seqnn_model.model.fit(
+    seqnn_model.fit(
       self.train_data[0].dataset,
       epochs=self.train_epochs_max,
       steps_per_epoch=self.train_epoch_batches[0],
@@ -138,7 +138,7 @@ class Trainer:
     if not self.compiled:
       self.compile(seqnn_model)
 
-    assert(len(seqnn_model.models) >= self.num_datasets)
+    assert(len(seqnn_model) >= self.num_datasets)
 
     ################################################################
     # prep
