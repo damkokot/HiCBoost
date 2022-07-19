@@ -20,6 +20,7 @@ def load_test(bedfile):
 			model_seqs.append(ModelSeq(record[0],int(record[1]),int(record[2]),None))
 	return model_seqs
 
+
 def check_range(margin_point, res, rng):
 	"""
 	checking if provided range or resolution values
@@ -47,6 +48,9 @@ def contacts(test_sequence, hic_data, res, rng):
 	Returning dictionary where keys are targest and values are 
 	list with contacts.
 	""" 
+
+	ModelSeq = collections.namedtuple('ModelSeq', ['chr', 'start', 'end', 'label'])
+
 	# chrom length
 	chrom_len = set_lenghts(hic_data)
 
@@ -111,13 +115,3 @@ def contacts(test_sequence, hic_data, res, rng):
 			hic_ngh.append(hic_seq)
 	
 	return hic_ngh
-
-if __name__ == "__main__":
-	bedfile = sys.argv[1]
-	hic_file = sys.argv[2]
-	ModelSeq = collections.namedtuple('ModelSeq', ['chr', 'start', 'end', 'label'])
-	seq_data = load_test(bedfile)
-	hic = hicstraw.HiCFile(hic_file)
-
-	for seq in seq_data:
-		print(contacts(seq, hic, 5000, 1000000))
