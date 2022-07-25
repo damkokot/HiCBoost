@@ -37,45 +37,40 @@ def merge(target_model, hic_model):
 	Cell type is then determined on the basis of hic sequences.
 	"""
 
-	# set list of outputs
-	outs = [target_model.output] + hic_model.output
+	# concatenate outputs from models
+	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output])
+	print(outs)
 
 	# set common denseblock for target and hic model
 	dense_merge = tf.keras.layers.Dense(16,
 		name='dense_merge')
 
-	currents = []
-	for out in outs:
-		currents.append(dense_merge(out))
-
-	merged_model = tf.keras.Model(inputs=outs, outputs=currents)
-	print(merged_model.output)
+	current = dense_merge(outs)
 
 	# apply batch norm and dropout
 	batch_normalization_merge = tf.keras.layers.BatchNormalization(momentum=0.90, 
 		gamma_initializer=None, name='batch_normalization_merge')
-	batch_norms = []
-	for current in merged_model.output:
-		batch_norms.append(batch_normalization_merge(current))
+
+	current = batch_normalization_merge(current)
 	
+	# apply dropout
 	dropout_merge = tf.keras.layers.Dropout(rate=0.2, name='dropout_merge')
-	dropouts = []
-	for batch_norm in batch_norms:
-		dropouts.append(dropout_merge(batch_norm))
+
+	current = dropout_merge(current)
 
 	# set final dense
 	dense_final_merge = tf.keras.layers.Dense(1,
 		name='dense_finale_merge',
 		activation='sigmoid')
-	dense_finals = []
-	for drop in dropouts:
-		dense_finals.append(dense_final_merge(drop))
+
+	current = dense_final_merge(current)
 
 	# set final model, plot, and display summary
-	model = tf.keras.Model([target_model.input, hic_model.input], dense_finals)
-	# tf.keras.utils.plot_model(model, to_file='final_merged_model_hic.png', show_shapes=True)
+	model = tf.keras.Model([target_model.input, hic_model.input], current)
+	print(model.output)
+	tf.keras.utils.plot_model(model, to_file='final_merged_model_hic.png', show_shapes=True)
 
-	# return model
+	return model
 
 
 def main(args=None):
