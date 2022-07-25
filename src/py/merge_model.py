@@ -39,7 +39,6 @@ def merge(target_model, hic_model):
 
 	# concatenate outputs from models
 	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output])
-	print(outs)
 
 	# set common denseblock for target and hic model
 	dense_merge = tf.keras.layers.Dense(16,
@@ -67,7 +66,7 @@ def merge(target_model, hic_model):
 
 	# set final model, plot, and display summary
 	model = tf.keras.Model([target_model.input, hic_model.input], current)
-	print(model.output)
+
 	tf.keras.utils.plot_model(model, to_file='final_merged_model_hic.png', show_shapes=True)
 
 	return model
