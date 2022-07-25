@@ -126,7 +126,20 @@ def conv_block(trained_model, rc=True, shift=3):
 		current = dense_common(out_conv)
 		out_convs.append(current)
 
-	full_model = tf.keras.Model(inputs=input_hic, outputs=out_convs)
+	# here add concatenate layer
+	current = tf.keras.layers.concatenate(out_convs)
+
+	# then pass to dense layer and get (1,164) shape output
+	dense_final_hic = tf.keras.layers.Dense(164, 
+		activation='sigmoid', 
+		name='dense_final_hic',
+		use_bias=True, 
+		kernel_initializer='he_normal', 
+		kernel_regularizer=tf.keras.regularizers.l1_l2(0, 0))
+	current = dense_final_hic(current)
+
+	# set model
+	full_model = tf.keras.Model(inputs=input_hic, outputs=current)
 
 	# tf.keras.utils.plot_model(full_model, to_file='just_a_model_hic.png', show_shapes=True)
 
