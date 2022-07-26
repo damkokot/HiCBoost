@@ -38,7 +38,7 @@ def merge(target_model, hic_model):
 	"""
 
 	# concatenate outputs from models
-	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output])
+	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output], axis=1)
 
 	# set common denseblock for target and hic model
 	dense_merge = tf.keras.layers.Dense(16,
