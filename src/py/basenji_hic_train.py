@@ -116,7 +116,7 @@ def main(args=None):
 	cell_id = get_cell_id(args.target, args.cell_type)
 
 	# load data
-	train_data, eval_data = load_data(args.dataset, params_train)[0], load_data(args.dataset, params_train)[1]
+	train_data, eval_data = load_data(args.dataset, params_train, cell_id)[0], load_data(args.dataset, params_train, cell_id)[1]
 
 
 	# set models
