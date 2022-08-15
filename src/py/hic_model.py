@@ -81,7 +81,7 @@ def conv_block(trained_model, rc=True, shift=3):
 	# for each vector that represents each sequence from hic map
 	# create convolutional block separetely 
 	output_conv = []
-	for i in range(0, 25000, 192):
+	for i in range(0, 25000, 576):
 		if i + 1344 < 25000:		
 			inp_hic = input_hic[:, i:i + 1344, :]
 			inp_hic._name = f"neighbour_{i}"
@@ -111,7 +111,10 @@ def conv_block(trained_model, rc=True, shift=3):
 	# model for conv blocks
 	conv_model = tf.keras.Model(inputs=input_hic, outputs=output_conv)
 
-	# # set dense layer, common for outputs from each conv block
+	# freeze layers of pretrained model
+	conv_model.trainable = False
+
+	# set dense layer, common for outputs from each conv block
 	dense_common = tf.keras.layers.Dense(16, 
 	activation='sigmoid', 
 	name='dense_common',
@@ -141,7 +144,7 @@ def conv_block(trained_model, rc=True, shift=3):
 	# set model
 	full_model = tf.keras.Model(inputs=input_hic, outputs=current)
 
-	# tf.keras.utils.plot_model(full_model, to_file='just_a_model_hic.png', show_shapes=True)
+	tf.keras.utils.plot_model(full_model, to_file='just_a_model_hic.png', show_shapes=True)
 
 	return full_model
 
