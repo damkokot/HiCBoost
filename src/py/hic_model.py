@@ -81,7 +81,7 @@ def conv_block(trained_model, rc=True, shift=3):
 	# for each vector that represents each sequence from hic map
 	# create convolutional block separetely 
 	output_conv = []
-	for i in range(0, 25000, 576):
+	for i in range(0, 25000, 384):
 		if i + 1344 < 25000:		
 			inp_hic = input_hic[:, i:i + 1344, :]
 			inp_hic._name = f"neighbour_{i}"
