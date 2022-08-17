@@ -54,6 +54,8 @@ def main():
       help='Sequence end index [Default: %default]')
   parser.add_option('--te', dest='target_extend',
       default=None, type='int', help='Extend targets vector [Default: %default]')
+  parser.add_option('--res', dest='resolution',
+    default=None, type='int', help='Range of HiC map bin')
   parser.add_option('-u', dest='umap_npy',
       help='Unmappable array numpy file')
   parser.add_option('--umap_clip', dest='umap_clip',
@@ -88,6 +90,8 @@ def main():
     options.end_i = len(model_seqs)
 
   num_seqs = options.end_i - options.start_i
+
+  resolution = options.resolution
 
   ################################################################
   # determine sequence coverage files
@@ -162,7 +166,7 @@ def main():
       # seq_1hot = dna_1hot_index(seq_dna) # more efficient, but fighting inertia
 
       # fetch dna for sequences extracted from HiC data
-      hic_seq = get_hic.contacts(mseq, hic_data, 5000, 1000000)
+      hic_seq = get_hic.contacts(mseq, hic_data, resolution, 1000000)
 
       assert(len(hic_seq)==5)
       
