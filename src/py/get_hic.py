@@ -12,6 +12,7 @@ def load_test(bedfile):
 	Loading bed format file with test sequences.
 	Extract them and return a list with sequences.
 	"""
+	ModelSeq = collections.namedtuple('ModelSeq', ['chr', 'start', 'end', 'label'])
 	model_seqs = []
 	with open(bedfile, 'r') as bf:
 		bf = bf.readlines()
@@ -83,6 +84,7 @@ def contacts(test_sequence, hic_data, res, rng):
 	
 	# set contact vector
 	contact_vector = contact_obj.getRecordsAsMatrix(start_row, end_row, start_col, end_col)
+	print(contact_vector.shape)
 	
 	# set list to store hic seqs
 	hic_ngh = []
@@ -92,7 +94,7 @@ def contacts(test_sequence, hic_data, res, rng):
 		
 		# get best scores of bins
 		best_contacts = np.argpartition(contact_vector, -5, axis=None)[-5:]
-
+		print(best_contacts)
 		for contact_bin in best_contacts:
 			# set beginning and end of bin
 			begin_bin, end_bin = start_row + (contact_bin * res) - res , start_row + (contact_bin * res)
@@ -104,7 +106,7 @@ def contacts(test_sequence, hic_data, res, rng):
 	
 	# set sequences if there is no output for conctact vector
 	elif contact_vector.shape == (1,1):
-		med_bin = 201
+		med_bin = (2*rng/res)/2 + 1
 		best_contacts = [med_bin - 2, med_bin -1, med_bin, med_bin + 1, med_bin + 2]
 
 		for contact_bin in best_contacts:
@@ -115,3 +117,10 @@ def contacts(test_sequence, hic_data, res, rng):
 			hic_ngh.append(hic_seq)
 	
 	return hic_ngh
+
+
+if __name__ == "__main__":
+	bedfile, hic_data = sys.argv[1], sys.argv[2]
+	hic_data = hicstraw.HiCFile(hic_data)
+	sequences = load_test(bedfile)
+	print(contacts(sequences[0], hic_data, 5000 , 1000000))
