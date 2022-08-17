@@ -86,13 +86,13 @@ def main(args=None):
 	# load parameters
 	params_model_target = custom_model.get_dense(args.params)
 
-	# set models
-	for_target_model = custom_model.build_dense(params_model_target, pre_model)
+	# # set models
+	# for_target_model = custom_model.build_dense(params_model_target, pre_model)
 
 	for_hic_model = hic_model.conv_block(pre_model)
 
 	# call model
-	merge(for_target_model, for_hic_model)
+	merge(pre_model, for_hic_model)
 
 
 if __name__ == "__main__":
