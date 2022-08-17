@@ -74,45 +74,43 @@ def load_params(params_file):
 
 
 def conv_block(trained_model, rc=True, shift=3):
-		
+	
+	# FIXNE: freeze model before changing it
+	trained_model.trainable = False
+	
 	# input for hic sequences (5 neigbours each has 5000 length)
 	input_hic = tf.keras.Input(shape=(25000, 4), name='hic')
 	
 	# for each vector that represents each sequence from hic map
 	# create convolutional block separetely 
 	output_conv = []
-	for i in range(0, 25000, 384):
-		if i + 1344 < 25000:		
-			inp_hic = input_hic[:, i:i + 1344, :]
-			inp_hic._name = f"neighbour_{i}"
+	for i in range(0, 25000 - 1344, 384):
+		inp_hic = input_hic[:, i:i + 1344, :]
+		inp_hic._name = f"neighbour_{i}"
 
-			current = inp_hic
+		current = inp_hic
 
-			# augmentation
-			if rc:
-				current , reverse_bool = layers.StochasticReverseComplementHic()(current)
-			if shift != [0]:
-			 	current = layers.StochasticShiftHic(shift)(current)
+		# augmentation
+		if rc:
+			current , reverse_bool = layers.StochasticReverseComplementHic()(current)
+		if shift != [0]:
+		 	current = layers.StochasticShiftHic(shift)(current)
 
 
-			loaded_model = tf.keras.Model(trained_model.get_layer('conv1d').input, 
-				trained_model.get_layer('dense_1').output)
+		loaded_model = tf.keras.Model(trained_model.get_layer('conv1d').input, 
+			trained_model.get_layer('dense_1').output)
 
-			current = loaded_model(current)
-			
-			if rc:
-				current = layers.SwitchReverseHic(None)([current, reverse_bool])
+		current = loaded_model(current)
+		
+		if rc:
+			current = layers.SwitchReverseHic(None)([current, reverse_bool])
 
-			# add output from each conv block to a list
-			output_conv.append(current)
-		else:
-			break
+		# add output from each conv block to a list
+		output_conv.append(current)
+
 	
 	# model for conv blocks
 	conv_model = tf.keras.Model(inputs=input_hic, outputs=output_conv)
-
-	# freeze layers of pretrained model
-	conv_model.trainable = False
 
 	# set dense layer, common for outputs from each conv block
 	dense_common = tf.keras.layers.Dense(16, 
