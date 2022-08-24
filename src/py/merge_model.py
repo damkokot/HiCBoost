@@ -3,6 +3,7 @@
 # import models
 import custom_model
 import hic_model
+import layers
 
 import argparse
 import json
@@ -37,12 +38,11 @@ def merge(target_model, hic_model):
 	Cell type is then determined on the basis of hic sequences.
 	"""
 
-	# concatenate outputs from models
-
 	# freezing original model
 	# freezing allowed to reduce trainable weight from 44 to 10
 	target_model.trainable = False
 
+	# concatenate outputs from models
 	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output])
 	
 	# set common denseblock for target and hic model
@@ -62,6 +62,9 @@ def merge(target_model, hic_model):
 
 	current = dropout_merge(current)
 
+	# final activation
+	current = layers.activate(current, 'gelu_final')
+	
 	# set final dense
 	dense_final_merge = tf.keras.layers.Dense(1,
 		name='dense_finale_merge',
@@ -73,7 +76,7 @@ def merge(target_model, hic_model):
 	model = tf.keras.Model([target_model.input, hic_model.input], current)
 
 	tf.keras.utils.plot_model(model, to_file='final_merged_model_hic.png', show_shapes=True)
-
+	print(model.summary())
 	return model
 
 
@@ -81,15 +84,9 @@ def main(args=None):
 	args = load_args(args)
 
 	# load pretrained model
-	pre_model = custom_model.load_trained_md(args.model)
+	pre_model = tf.keras.models.load_model(args.model, compile=False)
 
-	# load parameters
-	params_model_target = custom_model.get_dense(args.params)
-
-	# # set models
-	# for_target_model = custom_model.build_dense(params_model_target, pre_model)
-
-	for_hic_model = hic_model.conv_block(pre_model)
+	for_hic_model = hic_model.build_hic_model(pre_model)
 
 	# call model
 	merge(pre_model, for_hic_model)
