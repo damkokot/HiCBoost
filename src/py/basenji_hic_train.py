@@ -76,7 +76,7 @@ def load_data(data_dir, params_train, cell_id):
 	split_label='valid',
 	batch_size=params_train['batch_size'],
 	hic_length = 25000,
-	cell_id = cell_id
+	cell_id = cell_id,
 	mode='eval',
 	tfr_pattern=None))
 
@@ -106,10 +106,9 @@ def main(args=None):
 	args = load_args(args)
 
 	# load pretrained model
-	pre_model = custom_model.load_trained_md(args.model)
+	pre_model = tf.keras.models.load_model(args.model, compile=False)
 
 	# load parameters
-	params_model = custom_model.get_dense(args.params)
 	params_train = train_params(args.params)
 
 	# get cell type id
@@ -118,14 +117,10 @@ def main(args=None):
 	# load data
 	train_data, eval_data = load_data(args.dataset, params_train, cell_id)[0], load_data(args.dataset, params_train, cell_id)[1]
 
-
-	# set models
-	for_target_model = custom_model.build_dense(params_model, pre_model)
-
-	for_hic_model = hic_model.conv_block(pre_model)
+	for_hic_model = hic_model.build_hic_model(pre_model)
 
 	# call model
-	full_model = merge_model.merge(for_target_model, for_hic_model)
+	full_model = merge_model.merge(pre_model, for_hic_model)
 
 	# train and fit
 	train_and_fit(params_train, train_data, eval_data, full_model, args.out_dir)
