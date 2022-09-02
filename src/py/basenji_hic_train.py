@@ -27,6 +27,10 @@ def load_args(args=None):
 	parser.add_argument('-p', '--params', type=str, help='file with parameters')
 	parser.add_argument('-t', '--target', type=str, help='file with targets')
 	parser.add_argument('-ct', '--cell_type', type=str, help='name of the cell type of interest, based on HiC data')
+	parser.add_argument('-k', dest='keras_fit', default=False, action='store_true',
+		help='Train with Keras fit method [Default: %default]')
+	parser.add_argument('--restore',dest='restore', default=False, action='store_true')
+	parser.add_argument('-mf', dest='model_file', type='str', default=None)
 	parser.add_argument('-o', '--out_dir', type=str, help='path in which model will be stored')
 	return parser.parse_args(args)
 
@@ -83,8 +87,9 @@ def load_data(data_dir, params_train, cell_id):
 	return train_data, eval_data
 
 
-def train_and_fit(params_train, train_data, eval_data, model, out_dir, keras_fit='True'):
+def train_and_fit(params_train, train_data, eval_data, model, out_dir, keras_fit, restore):
 	"""Compiling model and perform training"""
+
 	seqnn_trainer = trainer.Trainer(params_train, train_data,
 		eval_data,out_dir)
 
@@ -117,13 +122,19 @@ def main(args=None):
 	# load data
 	train_data, eval_data = load_data(args.dataset, params_train, cell_id)[0], load_data(args.dataset, params_train, cell_id)[1]
 
+	# build model for HiC sequences
 	for_hic_model = hic_model.build_hic_model(pre_model)
 
 	# call model
-	full_model = merge_model.merge(pre_model, for_hic_model)
-
+	if args.restore:
+		full_model = tf.keras.models.load_model(args.model_file, custom_objects={'StochasticReverseComplement': layers.StochasticReverseComplement(),  
+	                                                                  'SwitchReverse': layers.SwitchReverse(), 'StochasticShift': layers.StochasticShift, 
+	                                                                  'GELU': layers.GELU(), 'GELU_FINAL': layers.GELU_FINAL}, compile=False)
+	else:
+		full_model = merge_model.merge(pre_model, for_hic_model)
+	
 	# train and fit
-	train_and_fit(params_train, train_data, eval_data, full_model, args.out_dir)
+	train_and_fit(params_train, train_data, eval_data, full_model, args.out_dir, args.keras_fit)
 
 
 if __name__ == "__main__":
