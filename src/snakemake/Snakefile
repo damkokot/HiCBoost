@@ -92,6 +92,33 @@ rule leave_out_one_chr:
 
     sed -e "s|data/basset_like/full/|data/basset_like/wo_{wildcards.chr}/|" < {input} > {output}
     """
+### to have only with chr 1 fix "-v" argument
+
+rule keep_chr:
+  input:
+    "data/basset_like/full/targets.txt"
+  output:
+    "data/basset_like/keep_{chr}/targets.txt"
+
+  shell:
+    """
+    mkdir -p data/basset_like/keep_{wildcards.chr}/encode/
+    mkdir -p data/basset_like/keep_{wildcards.chr}/roadmap/
+    
+    for f in $(cd data/basset_like/full/encode; ls *.narrowPeak.gz); do
+      zcat data/basset_like/full/encode/$f |
+        grep -P "^{wildcards.chr}\t" |
+        gzip > data/basset_like/keep_{wildcards.chr}/encode/$f
+    done
+
+    for f in $(cd data/basset_like/full/roadmap; ls *.bed.gz); do
+      zcat data/basset_like/full/roadmap/$f |
+        grep -P "^{wildcards.chr}\t" |
+        gzip > data/basset_like/keep_{wildcards.chr}/roadmap/$f
+    done
+
+    sed -e "s|data/basset_like/full/|data/basset_like/keep_{wildcards.chr}/|" < {input} > {output}
+    """
 
 rule make_data:
   input:
