@@ -22,8 +22,9 @@ def load_args(args=None):
 		help='Clip values at unmappable positions to distribution quantiles, eg 0.25. [Default: %default]')
 	parser.add_argument('-ut', '--umap_tfr', default=False, action='store_true', 
 		help='Save umap array into TFRecords [Default: %default]')
-	parser.add_argument('-c', '--crop', type=int, help='file with parameters')
-	parser.add_argument('-p', '--processes', type=int, help='file with parameters')
+	parser.add_argument('-c', '--crop', type=int)
+	parser.add_argument('-p', '--processes', type=int)
+	parser.add_argument('-res', '--resolution', type=int, help='Range of HiC map bin')
 	parser.add_argument('-o', '--out_dir', type=str, help='path in which TFRecords will be stored')
 	return parser.parse_args(args)
 
@@ -75,11 +76,12 @@ def main(args=None):
 		while tfr_start <= fold_set_end:
 			tfr_stem = '%s/%s-%d' % (tfr_dir, fold_set, tfr_i)
 
-			cmd = 'CUDA_VISIBLE_DEVICES=1 src/py/basenji_data_write_mod.py'
+			cmd = 'src/py/basenji_data_write_mod.py'
 			cmd += ' -s %d' % tfr_start
 			cmd += ' -e %d' % tfr_end
 			cmd += ' --umap_clip %f' % args.umap_clip
 			cmd += ' -x %d' % args.crop
+			cmd += ' --res %d' % args.resolution
 			# if options.umap_tfr:
 			# 	cmd += ' --umap_tfr'
 			# if options.umap_bed is not None:

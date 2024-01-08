@@ -84,7 +84,6 @@ def contacts(test_sequence, hic_data, res, rng):
 	
 	# set contact vector
 	contact_vector = contact_obj.getRecordsAsMatrix(start_row, end_row, start_col, end_col)
-	print(contact_vector.shape)
 	
 	# set list to store hic seqs
 	hic_ngh = []
@@ -94,7 +93,6 @@ def contacts(test_sequence, hic_data, res, rng):
 		
 		# get best scores of bins
 		best_contacts = np.argpartition(contact_vector, -5, axis=None)[-5:]
-		print(best_contacts)
 		for contact_bin in best_contacts:
 			# set beginning and end of bin
 			begin_bin, end_bin = start_row + (contact_bin * res) - res , start_row + (contact_bin * res)
@@ -112,7 +110,7 @@ def contacts(test_sequence, hic_data, res, rng):
 		for contact_bin in best_contacts:
 			# set beginning and end of bin
 			begin_bin, end_bin = start_row + (contact_bin * res) - res , start_row + (contact_bin * res)
-			hic_seq = ModelSeq(msq.chr, begin_bin, end_bin, None)
+			hic_seq = ModelSeq(msq.chr, int(begin_bin), int(end_bin), None)
 			# write sequence
 			hic_ngh.append(hic_seq)
 	
@@ -123,4 +121,4 @@ if __name__ == "__main__":
 	bedfile, hic_data = sys.argv[1], sys.argv[2]
 	hic_data = hicstraw.HiCFile(hic_data)
 	sequences = load_test(bedfile)
-	print(contacts(sequences[0], hic_data, 5000 , 1000000))
+	print(contacts(sequences[0], hic_data, 2000, 400000))

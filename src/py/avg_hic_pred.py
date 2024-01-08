@@ -20,18 +20,17 @@ def avg_prediction_score(pred_array, start_block, end_block):
 	"""
 	Avaraging score from given range of block
 	"""	
-	pred_array = pred_array[start_block: end_block]
+	pred_array = pred_array[start_block + 1: end_block]
+	print(pred_array)
 	sum_of_elements = 0
-	for arr in pred_array:
-		sum_of_elements += arr
-	if len(pred_array) >= 1:
+	if len(pred_array) > 1:	
+		pred_array_tp = pred_array.transpose(2,0,1).reshape(164,-1)
+		print(f'transpose:{pred_array_tp}')
+		for arr in pred_array:
+			sum_of_elements += arr
 		return sum_of_elements/len(pred_array)
-	else:
-		return pred_array
-	# warunek dla samych danych z HiC
-	# na początku wziąć tylko te sekwencje targetowe i z nich stworzyć h5
-	# później tylko hic
-	# później średnia tylko z hic i dodać do predukcji i podzielić na 2
+	elif len(pred_array) == 1:
+		return np.zeros((1, pred_array[0].shape[2]))
 	
 
 def pred_file(tsv_file, h5_hic, out_pred):
@@ -45,23 +44,24 @@ def pred_file(tsv_file, h5_hic, out_pred):
 
 	# Parse dataframe to get blocks of targets and their
 	# neighbours and initialize output h5 file
-	created = False
 	with h5py.File(out_pred, 'w') as out_h5:
 		out_h5.create_dataset('preds', shape=(seq_count, pred_array.shape[1], pred_array.shape[2]), dtype='float16')
 
-		start_block = int(tsv_df['seq_id'][0])
-		seq_num = 0 
-		for seq_id in range(1, len(tsv_df['seq_id'])):
-			if tsv_df['seq_id'][seq_id] != '-' and int(tsv_df['seq_id'][seq_id]) != start_block:
-				end_block = seq_id
-				out_h5['preds'][int(tsv_df['seq_id'][start_block])] = avg_prediction_score(pred_array, start_block, end_block)
-				start_block = end_block
-				seq_num += 1
-			elif seq_id + 1 == len(tsv_df['seq_id']):
-				end_block = seq_id + 2 # exception for last row from tsv file
-				out_h5['preds'][int(tsv_df['seq_id'][start_block])] = avg_prediction_score(pred_array, start_block, end_block)
-				seq_num += 1
-			print(f'Saved sequence number {seq_num}')
+	start_block = int(tsv_df['seq_id'][0])
+	seq_num = 0 
+	for seq_id in range(1, len(tsv_df['seq_id'])):
+		if tsv_df['seq_id'][seq_id] != '-' and int(tsv_df['seq_id'][seq_id]) != start_block:
+			end_block = seq_id
+			out_h5['preds'][int(tsv_df['seq_id'][start_block])] = avg_prediction_score(pred_array, start_block, end_block)
+			avg_prediction_score(pred_array, start_block, end_block)
+			start_block = end_block
+			seq_num += 1
+		elif seq_id + 1 == len(tsv_df['seq_id']):
+			end_block = seq_id + 1 # exception for last row from tsv file
+			out_h5['preds'][int(tsv_df['seq_id'][start_block])] = avg_prediction_score(pred_array, start_block, end_block)
+			avg_prediction_score(pred_array, start_block, end_block)
+			seq_num += 1
+		print(f'Saved sequence number {seq_num}')
 	print('Output file created.')
 				
 

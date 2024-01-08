@@ -31,13 +31,14 @@ import tensorflow as tf
 
 import get_hic
 """
-basenji_data_write.py
+basenji_data_write_mod.py
 
-Write TF Records for batches of model sequences.
+Modification of basenji_data_write.py from Basenji repository
+of 2019 Calico LLC
 
-Notes:
--I think target_start and target_end are remnants of my previous data2 pipeline.
- If I see this again beyond 8/2020, remove it.
+Write TF Records for batches of model sequences and their neighbors
+extracted from HiC maps data.
+
 """
 
 ################################################################################
@@ -200,7 +201,7 @@ def fetch_dna(fasta_open, chrm, start, end):
   # initialize sequence
   seq_len = end - start
   seq_dna = ''
-
+  
   # add N's for left over reach
   if start < 0:
     seq_dna = 'N'*(-start)

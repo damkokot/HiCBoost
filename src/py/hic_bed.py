@@ -123,7 +123,6 @@ if __name__ == '__main__':
 	parser.add_argument('--range', type=int, 
 		help='range, to and from, the center of target sequence; value should be multiplicity of resolution')
 	parser.add_argument('--bed', type=str,default='hic_sequences.bed', help='bed type file name or path to it where records will be saved')
-	### ADD ARGUMENT FOR OUTPUT FILES
 	args = parser.parse_args()
 
 	hic = hicstraw.HiCFile(args.hic)

@@ -12,16 +12,17 @@ from natsort import natsorted
 import tensorflow as tf
 from tensorflow import keras
 
-import custom_model
+import trainer_hicboost
+
 import hic_model
 import merge_model
 import dataset_hic
-import trainer
+import layers
 
 
 def load_args(args=None):
 	""" Parse command-line arguments. """
-	parser = argparse.ArgumentParser(description='training model for sequences from DNASeq experiment and their neighbors from HiC data')
+	parser = argparse.ArgumentParser(description='HiCBoost training model')
 	parser.add_argument('-pm','--model', type=str, help='path to original saved model from Basenji project')
 	parser.add_argument('-d', '--dataset', type=str, help='path to data directory with tfr records')
 	parser.add_argument('-p', '--params', type=str, help='file with parameters')
@@ -30,7 +31,7 @@ def load_args(args=None):
 	parser.add_argument('-k', dest='keras_fit', default=False, action='store_true',
 		help='Train with Keras fit method [Default: %default]')
 	parser.add_argument('--restore',dest='restore', default=False, action='store_true')
-	parser.add_argument('-mf', dest='model_file', type='str', default=None)
+	parser.add_argument('-mf', dest='model_file', type=str, default=None)
 	parser.add_argument('-o', '--out_dir', type=str, help='path in which model will be stored')
 	return parser.parse_args(args)
 
@@ -67,6 +68,7 @@ def load_data(data_dir, params_train, cell_id):
 	eval_data = []
 
 	# load train data
+	# FIX: change hic_length hardcoding, automatically retrieve from tfr_records
 	train_data.append(dataset_hic.SeqDataset(data_dir, 
 		split_label='train', 
 		batch_size=params_train['batch_size'], 
@@ -87,7 +89,7 @@ def load_data(data_dir, params_train, cell_id):
 	return train_data, eval_data
 
 
-def train_and_fit(params_train, train_data, eval_data, model, out_dir, keras_fit, restore):
+def train_and_fit(params_train, train_data, eval_data, model, out_dir, keras_fit):
 	"""Compiling model and perform training"""
 
 	seqnn_trainer = trainer.Trainer(params_train, train_data,
@@ -128,8 +130,8 @@ def main(args=None):
 	# call model
 	if args.restore:
 		full_model = tf.keras.models.load_model(args.model_file, custom_objects={'StochasticReverseComplement': layers.StochasticReverseComplement(),  
-	                                                                  'SwitchReverse': layers.SwitchReverse(), 'StochasticShift': layers.StochasticShift, 
-	                                                                  'GELU': layers.GELU(), 'GELU_FINAL': layers.GELU_FINAL}, compile=False)
+	                                                                  'SwitchReverse': layers.SwitchReverse(), 
+	                                                                  'StochasticShift': layers.StochasticShift}, compile=False)
 	else:
 		full_model = merge_model.merge(pre_model, for_hic_model)
 	

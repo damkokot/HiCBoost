@@ -106,8 +106,13 @@ class SeqDataset:
       if not raw:
         targets = tf.reshape(targets, [self.target_length, self.num_targets])
         targets = tf.cast(targets, tf.float32)
+        targets = [targets[:, self.cell_id]]
 
-      return (sequence, hic), targets[:,self.cell_id]
+      # FIXME exclude this to have 164 lenght target
+      # target = [targets[:, self.cell_id]]
+      input_data = {'sequence': sequence, 'hic':hic}
+      
+      return input_data, targets
 
     return parse_proto
 
@@ -219,22 +224,27 @@ class SeqDataset:
 
       # read TF Records
       dataset = dataset.flat_map(file_to_records)
+      print(dataset)
       dataset = dataset.map(self.generate_parser(raw=True))
       dataset = dataset.batch(1)
 
     # initialize inputs and outputs
     seqs_1hot = []
+    seqs_hic_1hot = []
     targets = []
 
     # collect inputs and outputs
     for seq_raw, targets_raw in dataset:
       # sequence
       if return_inputs:
-        seq_1hot = seq_raw.numpy().reshape((self.seq_length,-1))
-        if self.seq_length_crop is not None:
+        if isinstance(seq_raw, dict):
+          seq_1hot = seq_raw['sequence'].numpy().reshape((1344,-1))
+          seq_hic_1hot = seq_raw['hic'].numpy().reshape((25000,-1))
+        elif self.seq_length_crop is not None:
           crop_len = (self.seq_length - self.seq_length_crop) // 2
           seq_1hot = seq_1hot[crop_len:-crop_len,:]
         seqs_1hot.append(seq_1hot)
+        seqs_hic_1hot.append(seq_hic_1hot)
 
       # targets
       if return_outputs:
@@ -247,12 +257,13 @@ class SeqDataset:
 
     # make arrays
     seqs_1hot = np.array(seqs_1hot)
+    seqs_hic_1hot = np.array(seqs_hic_1hot)
     targets = np.array(targets, dtype=dtype)
 
     # return
     if return_inputs and return_outputs:
-      return seqs_1hot, targets
+      return seqs_1hot, seqs_hic_1hot, targets
     elif return_inputs:
-      return seqs_1hot
+      return seqs_1hot, seq_hic_1hot
     else:
       return targets

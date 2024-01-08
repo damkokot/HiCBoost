@@ -43,7 +43,7 @@ def merge(target_model, hic_model):
 	target_model.trainable = False
 
 	# concatenate outputs from models
-	outs = tf.keras.layers.concatenate([target_model.output,hic_model.output])
+	outs = tf.keras.layers.concatenate([target_model.output, hic_model.output])
 	
 	# set common denseblock for target and hic model
 	dense_merge = tf.keras.layers.Dense(16,
@@ -63,7 +63,7 @@ def merge(target_model, hic_model):
 	current = dropout_merge(current)
 
 	# final activation
-	current = layers.activate(current, 'gelu_final')
+	current = layers.activate(current, 'relu')
 	
 	# set final dense
 	dense_final_merge = tf.keras.layers.Dense(1,
@@ -76,7 +76,6 @@ def merge(target_model, hic_model):
 	model = tf.keras.Model([target_model.input, hic_model.input], current)
 
 	tf.keras.utils.plot_model(model, to_file='final_merged_model_hic.png', show_shapes=True)
-	print(model.summary())
 	return model
 
 
