@@ -1,6 +1,15 @@
-# project-template
-A project template for work.
+# HiCBoost
+#### Predicting functional activity of DNA sequences in the context of 3D genome organization.
 
+HiCBoost is a deep convolutional neural network which core is based on alread existing state-of-the-art predictive model [Basenji](https://github.com/calico/basenji/blob/master/).
+Given a context of 3D genome organization HiCBoost meant to enahnce performance of its predecessor. For this purpose a deep CNN model has been created using multiinput and transfer learning approaches. The generic and short description of the workflow would present as follows:
+1. Store pretrained weights of [Basenji](https://github.com/calico/basenji/blob/master/).
+2. Build deep CNN consist of block for sequences from DNase-seq peaks and block for extracted sequences from HiC maps that are in close spatial proximity to the DNase-seq peaks.
+3. Process two types of input through blocks and merged them.
+4. Merged outcome is then further processed by fully-connected dense block.
+5. The result is a single probablity value that given sequence is accesible or not in given cell type (here it is K562)
+Codebase offers performing data extraction and preprocessing, training, testing and other steps in reproducible and scalable manner.
+---------------------------------------------------------------------------------------------------
 General structure:
 * `config/` directory contains configuration information, including the central `config.yml` file.
 * `data/` directory contains all the source and processed data.
@@ -10,13 +19,31 @@ General structure:
 * `src/` directory contains all the code to perform the analyses. It is first divided by programming language, then by workflow.
 
 Note that all paths used in the project should be relative to the main
-project directory. Also all the programs should be run from there, e.g.
-`src/sh/test.sh`. See `./run_snakemake.sh` for an example Snakemake
-invocation.
+project directory.
 
-Usage instructions:
-* clone this repository (`git clone https://github.com/ajank/project-template.git`)
-* remove the .git subdirectory
-* update the absolute project path in config/config.yml
-* replace these instructions with a brief description of your very own project
-* commit as a new repository to GitHub.
+---------------------------------------------------------------------------------------------------
+# How to use
+#### Cloning repository and environment installation
+1. Clone repository via ``` git clone https://github.com/damkokot/HiCBoost.git ```
+2. From env directory, using environment_gpu.yaml create conda environment ``` conda env create -f environment_gpu.yaml ```
+3. Given basenji fetched repository, follow the steps from Installation from the [Basenji](https://github.com/calico/basenji/blob/master/) repository.
+4. For setting environmental variables one can use envs.sh script from src/sh directory
+
+#### Running Snakemake process as well as seperate steps
+To download, process and prepare data as also as perform base training, evaluation and finally build HiCBoost model (training) one can use Snakemake tool
+```
+snakemake --snakefile src/snakemake/Snakefile --use-conda -j 32 -k
+```
+This allows to maintain the workflow such it is reproducible and scalable. Worth to mention that Snakfile provide workflow only for 5% of the whole data.
+However all rules within Snakefile can be run using python command from CLI as main code is written in python and is well documented within the files.
+For example to run HiCBoost model one can run
+```
+python basenji_hic_train.py <params>
+```
+Nevertheless highly recommend running Snakemake at least for data preparation.
+
+##### NOTE: remember to set you paths and environment (specifically for running process on gpu) relative to local settings. Also many of the prepartion steps are already included in Basenji repository such as pretraining model, DNase-seq preprocessing etc.
+
+#### Further analaysis
+Performance and data analysis (evalaution of HiCBoost, data leakage percentage, impact of data leakage on performance, HiC sequences motifs analysis) have been done within notebooks presented in src/py/jupyter_notebook directory.
+
